@@ -98,6 +98,18 @@ def init_db():
             confirmed INTEGER DEFAULT 0
         )
     """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS orders (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            chat_id INTEGER,
+            username TEXT,
+            service_id INTEGER,
+            service_title TEXT,
+            price TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
     conn.commit()
     conn.close()
 
@@ -227,13 +239,29 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             kb = [[InlineKeyboardButton("⬅️ Назад", callback_data="services")]]
             await query.message.edit_text(text, reply_markup=InlineKeyboardMarkup(kb))
             return
-
+        
         # Сохраняем заказ
         order = {
             "user_id": query.from_user.id,
             "user_name": query.from_user.full_name,
             "service": s
         }
+        # Сохраняем заказ в БД
+        conn = sqlite3.connect("users.db")
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO orders (chat_id, username, service_id, service_title, price)
+            VALUES (?, ?, ?, ?, ?)
+        """, (
+            query.from_user.id,
+            query.from_user.full_name,
+            s["id"],
+            s["title"],
+            s["price"]
+        ))
+        conn.commit()
+        conn.close()
+
         data_store = load_data()
         data_store["orders"].append(order)
         save_data(data_store)
